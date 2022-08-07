@@ -1,25 +1,28 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+import { Field, FieldComponent } from './Field.js'
+import { Player, PlayerComponent } from './Player.js';
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.field = new Field(21, 11);
+    this.player = new Player(10 ,6, this.field);
+    
+    this.state = {
+      field: this.field,
+      player: this.player,
+    };
+  }
+
+  render() {
+    return (
+      <>
+        <FieldComponent field={this.state.field} />
+        <PlayerComponent key="player" player={this.state.player} />
+      </>
+    );
+  }
 }
 
 export default App;
