@@ -1,91 +1,92 @@
-import React from "react";
-import wall from './resources/wall.png'
-import grass from './resources/grass.png'
 
-
-export class Cell {
-    constructor(x, y, destroyed) {
-        this.x = x;
-        this.y = y;
-        this.destroyed = destroyed;
-        this.bonus = null;
-
-        this.blowUpCallback = null;
+export class CellContent {
+    constructor(cell) {
+        this.cell = cell;
     }
 
-    toString() {
-        return `${this.x}:${this.y} destroyed=${this.destroyed}`;
+    get x(){
+        return this.cell.x;
     }
 
-    blowUp() {
-        if (this.destroyed)
-            return;
-        this.destroyed = true;
-        //TODO expand bonus
-        if (this.blowUpCallback){
-            this.blowUpCallback();
-        }
+    get y(){
+        return this.cell.y;
+    }
+
+    get moveAvailable() {
+        return false;
+    }
+
+    applyBonus(playerFeature) {
+        console.log(`Cell content has not bonus for player`);
+        this.cell.content = null;
+    }
+
+    destroyContent() {
+        throw new Error('destroyContent must be emplemented!');
+    }
+
+    destroy() {
+        let res = this.destroyContent();
+        this.cell.content = null;
+        return res;
     }
 }
 
+export class Cell {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
 
-export class CellComponent extends React.Component {
-    static WIDTH = 30;
-    static HEIGHT = 30;
-    static OFFESET = 5;
-    static MARGIN = 2;
-
-    constructor(props) {
-        super(props);
-        this.cell = props.cell;
-        this.state = {
-            x: this.cell.x,
-            y: this.cell.y,
-            destroyed: this.cell.destroyed
-        };
-        this.cell.blowUpCallback = this.blowUpHandler.bind(this);
-        this.onClickHandler = this.onClickHandler.bind(this);
+        this._content = null;
+        this.contentUpdated = null;
     }
 
-    blowUpHandler(){
-        this.setState({destroyed: this.cell.destroyed});
+    toString() {
+        return `${this.x}:${this.y}`;
     }
 
-    // destroy cell for debug
-    onClickHandler(e) {
-        e.preventDefault();
-        console.log(`Cell ${this.cell} clicked`);
-        this.cell.blowUp();
+    set content(new_content) {
+        this._content = new_content;
+        if (this.contentUpdated)
+            this.contentUpdated();
     }
 
-    grassTile() {
-        return (
-            <img src={grass} alt=""
-                width={CellComponent.WIDTH + 2 * CellComponent.MARGIN}
-                height={CellComponent.HEIGHT + 2 * CellComponent.MARGIN}
-                style={{
-                    position: 'absolute',
-                    left: this.state.x * (CellComponent.WIDTH + CellComponent.MARGIN) - CellComponent.MARGIN + CellComponent.OFFESET,
-                    top: this.state.y * (CellComponent.HEIGHT + CellComponent.MARGIN) - CellComponent.MARGIN + CellComponent.OFFESET
-                }} />
-        );
+    get content() {
+        return this._content;
     }
 
-    wallTile() {
-        return (
-            <img src={wall} alt=""
-                width={CellComponent.WIDTH}
-                height={CellComponent.HEIGHT}
-                onClick={this.onClickHandler}
-                style={{
-                    position: 'absolute',
-                    left: this.state.x * (CellComponent.WIDTH + CellComponent.MARGIN) + CellComponent.OFFESET,
-                    top: this.state.y * (CellComponent.HEIGHT + CellComponent.MARGIN) + CellComponent.OFFESET
-                }} />
-        );
+    get moveAvailable() {
+        if (this._content)
+            return this._content.moveAvailable;
+        return true;
     }
 
-    render() {
-        return this.state.destroyed ? this.grassTile() : this.wallTile();
+    applyBonus(playerFeature) {
+        if (this._content)
+            this._content.applyBonus(playerFeature);
+    }
+
+    destroy() {
+        let res = false;
+        if (this._content)
+            res = this._content.destroy();
+        // this._content = null;
+        return res;
+    }
+
+}
+
+export class Wall extends CellContent {
+    constructor(cell) {
+        super(cell);
+        // this._destroyed = false;
+        this.destroyCallback = null;
+    }
+
+    destroyContent() {
+        // this._destroyed = true;
+        if (this.destroyCallback)
+            this.destroyCallback();
+        return true;
     }
 }

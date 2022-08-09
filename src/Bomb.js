@@ -1,40 +1,60 @@
-import React from "react";
-import { CellComponent } from './Cell.js'
-import { AnimationCompoent } from './Animation.js'
-import bomb from './resources/bomb.png'
+import { CellContent } from './Cell.js';
 
-export class BombFeature{
+export class BombFeature {
     constructor() {
         this.strength = 3;  // length of explosion
         this.timer = 2000;  //milliseconds
     }
 }
 
-export class Bomb {
-    constructor(x, y, owner) {
-        this.x = x;
-        this.y = y;
-        this.owner = owner;
-        this.exploded = false;
 
-        this.explosionTimer = setInterval(
-            () => this.explosion(), 
-            this.owner.features.bombFeature.timer);
+export class Bomb extends CellContent {
+    constructor(cell, owner, field) {
+        super(cell);
+        this._field = field;
+        this._owner = owner;
+        this._exploded = false;
 
-        this.explosionCallback = [];
+        this.explosionTimer = setTimeout(() => this.destroy(), this.features.timer);
+        this._updated = null;
     }
 
-    get features(){
-        return this.owner.features.bombFeature;
+    get owner() {
+        return this._owner;
     }
 
-    explosion() {
-        console.log(`${this} exploded!`);
-        this.exploded = true;
+    get features() {
+        return this._owner.features.bombFeature;
+    }
+
+    get exploded() {
+        return this._exploded;
+    }
+
+    #destroyDirection(x, y, dx, dy, depth) {
+        if (depth < 0) return;
+        let cell = this._field.getCell(x + dx, y + dy);
+        if (!cell) return;
+        if (cell.destroy()) return;
+        this.#destroyDirection(x + dx, y + dy, dx, dy, depth - 1);
+    }
+
+    destroyContent() {
+        if (this._exploded) return true;
+        // console.log(`${this} exploded!`);
+        this._exploded = true;
+        this.#destroyDirection(this.x, this.y, 1, 0, this.features.strength - 1);
+        this.#destroyDirection(this.x, this.y, -1, 0, this.features.strength - 1);
+        this.#destroyDirection(this.x, this.y, 0, 1, this.features.strength - 1);
+        this.#destroyDirection(this.x, this.y, 0, -1, this.features.strength - 1);
+        
+        this._field.getCell(this.x, this.y).content = null;
+        this._owner.bombExploded(this);
         clearInterval(this.explosionTimer);
-        for (let callback of this.explosionCallback) {
-            callback(this);
+        if (this._updated) {
+            this._updated();
         }
+        return true;
     }
 
     toString() {
@@ -43,54 +63,3 @@ export class Bomb {
 }
 
 
-
-export class BombComponent extends AnimationCompoent {
-    constructor(props) {
-        super(props);
-        this.bomb = props.bomb;
-        this.state = {
-            x: this.bomb.x,
-            y: this.bomb.y,
-            scale: 1.0,
-            exploded: this.bomb.exploded,
-        };
-        this.animationDirection = -1;
-        this.bomb.explosionCallback.push(this.explosionHandler.bind(this));
-    }
-
-    explosionHandler() {
-        this.finishAnimation();
-        this.setState({ exploded: this.bomb.exploded });
-    }
-
-    updateAnimation() {
-        if (this.state.scale < 0.7)
-            this.animationDirection = 1;
-        if (this.state.scale > 1)
-            this.animationDirection = -1;
-        this.setState((state) => ({ 
-            scale: state.scale + this.animationDirection * 0.02
-        }));
-    }
-
-    render() {
-        if (this.state.exploded)
-            return null;
-
-        let _width = this.state.scale * CellComponent.WIDTH;
-        let _heigth = this.state.scale * CellComponent.HEIGHT;
-        let _left = this.state.x * (CellComponent.WIDTH + CellComponent.MARGIN) + CellComponent.OFFESET;
-        let _top = this.state.y * (CellComponent.HEIGHT + CellComponent.MARGIN) + CellComponent.OFFESET;
-        _left += (CellComponent.WIDTH - _width) / 2;
-        _top += (CellComponent.HEIGHT - _heigth) / 2;
-
-        return (
-            <img src={bomb} alt="" width={_width} height={_heigth}
-                style={{
-                    position: 'absolute', 
-                    left: _left, 
-                    top: _top
-                }} />
-        );
-    }
-}

@@ -1,155 +1,113 @@
-import React from 'react';
-import player from './resources/player.png'
-import { CellComponent } from './Cell.js'
 import { Bomb, BombFeature } from './Bomb.js';
+import { CellContent } from './Cell.js'
+const tf = require('@tensorflow/tfjs');
 
 
 class PlayerFeature {
     constructor() {
         this.speed = 2;         // speed of moving
+        this.bombCapacity = 2;
         this.bombFeature = new BombFeature();
     }
 }
 
-export class Player {
-    constructor(x, y, field) {
-        this.x = x;
-        this.y = y;
-        this.field = field;
+class AbstractPlayer extends CellContent {
+    constructor(name, cell, field) {
+        super(cell);
+        cell.content = this;
+        // private
+        this._name = name;
+        this._field = field;
+        this._moveCallbacks = new Set();
+        this.diedCallback = null;
+
+        // public
         this.features = new PlayerFeature();
 
-        this.moveCallback = null;
-    }
-
-    move(dx, dy) {
-        let cell = this.field.getCell(this.x + dx, this.y + dy);
-        if (!cell.destroyed)
-            return;
-        this.x += dx;
-        this.y += dy;
-        if (this.moveCallback) {
-            this.moveCallback();
-        }
-    }
-
-    placeBomb() {
-        this.field.placeBomb(new Bomb(this.x, this.y, this));
-    }
-}
-
-
-export class PlayerComponent extends React.Component {
-    constructor(props) {
-        super(props);
-        this.animateMovingTimer = null;
-
-        this.player = props.player;
-        this.player.moveCallback = this.playerMoveHandler.bind(this);
-
-        this.state = {
-            absx: this.xToAbdsolute(this.player.x),
-            absy: this.yToAbdsolute(this.player.y)
+        this._state = {
+            hasDied: false,
+            bombsAmount: 0,
         };
     }
 
-    playerMoveHandler() {
-        if (this.animateMovingTimer)
+    #notifyMoveCallback() {
+        for (let callback of this._moveCallbacks)
+            callback();
+    }
+
+    addMoveCallback(callback) {
+        this._moveCallbacks.add(callback);
+    }
+
+    move(dx, dy) {
+        if (this._state.hasDied) return;
+
+        let cell = this._field.getCell(this.x + dx, this.y + dy);
+        if (!cell) return;
+        if (!cell.moveAvailable)
             return;
-        this.animateMoving();
+        cell.applyBonus(this.features);
+
+        // если игрок поставил бомбу в клетку, он уже не является 
+        // содержимым этой клетки, теперь там бомба
+        if (this.cell.content === this)
+            this.cell.content = null;
+        this.cell = cell;
+        this.cell.content = this;
+        this.#notifyMoveCallback();
     }
 
-    yToAbdsolute(y) {
-        return y * (CellComponent.HEIGHT + CellComponent.MARGIN) + CellComponent.OFFESET;
-    }
+    placeBomb() {
+        if (this._state.hasDied) return;
 
-    xToAbdsolute(x) {
-        return x * (CellComponent.WIDTH + CellComponent.MARGIN) + CellComponent.WIDTH / 3 + CellComponent.OFFESET;
-    }
-
-    updateAnimation() {
-        let targetX = this.xToAbdsolute(this.player.x);
-        let targetY = this.yToAbdsolute(this.player.y);
-
-        let _absx = this.state.absx +
-            Math.sign(targetX - this.state.absx) *
-            Math.min(
-                Math.abs(targetX - this.state.absx),
-                this.player.features.speed
-            );
-        let _absy = this.state.absy +
-            Math.sign(targetY - this.state.absy) *
-            Math.min(
-                Math.abs(targetY - this.state.absy),
-                this.player.features.speed
-            );
-
-        if (targetX === this.state.absx && targetY === this.state.absy) {
-            clearInterval(this.animateMovingTimer);
-            this.animateMovingTimer = null;
+        if (this._state.bombsAmount >= this.features.bombCapacity) {
+            console.log(`Max bomb amount ${this._state.bombsAmount}`);
             return;
         }
-        this.setState({
-            absx: _absx,
-            absy: _absy,
-        });
-    }
 
-    animateMoving() {
-        this.animateMovingTimer = setInterval(
-            () => this.updateAnimation(),
-            30
-        );
-    }
-
-    componentDidMount() {
-        this.keyDownHandler = this.keyDownHandler.bind(this);
-        this._mounted = false;
-        if (!this._mounted) {
-            this._mounted = true;
-            document.addEventListener('keydown', this.keyDownHandler);
-        }
-    }
-
-    keyDownHandler(e) {
-        // if (this.animateMovingTimer) {
-        //     e.preventDefault();
-        //     return false
-        // }
-
-        if (e.code === "ArrowLeft") {
-            this.player.move(-1, 0);
-        }
-        else if (e.code === "ArrowRight") {
-            this.player.move(1, 0);
-        }
-        else if (e.code === "ArrowUp") {
-            this.player.move(0, -1);
-        }
-        else if (e.code === "ArrowDown") {
-            this.player.move(0, 1);
-        }
-        else if (e.code === "Space") {
-            this.player.placeBomb();
+        let cell = this._field.getCell(this.x, this.y);
+        if (cell.content === this) {
+            let bomb = new Bomb(cell, this, this._field);
+            this._state.bombsAmount += 1;
+            this._field.getCell(this.x, this.y).content = bomb;
         }
         else {
-            return false;
+            console.log(`Cell ${cell} already has ${cell.content}`);
+            return;
+
         }
-        // console.log(e.code);
-        e.preventDefault();
-        return false;
     }
 
-    render() {
-        return (
-            <img src={player} alt=""
-                width={CellComponent.WIDTH / 2}
-                height={CellComponent.HEIGHT}
-                onKeyDown={this.keyDownHandler}
-                style={{
-                    position: 'absolute',
-                    left: this.state.absx,
-                    top: this.state.absy
-                }} />
-        );
+    bombExploded(bomb) {
+        if (bomb.cell === this.cell) {
+            this.destroy(); // сам себя подорвал!
+        }
+
+        this._state.bombsAmount -= 1;
+        if (this._state.bombsAmount < 0)
+            console.log(`${this} has bombsAmount < 0!`);
     }
+
+    destroyContent() {
+        if (this._state.hasDied) return;
+
+        console.log(`${this} has died!`);
+        this._state.hasDied = true;
+        if (this.diedCallback)
+            this.diedCallback();
+    }
+
+    toString() {
+        return `${this._name}`;
+    }
+}
+
+export class Player extends AbstractPlayer {
+
+}
+
+
+export class Bot extends AbstractPlayer {
+    // https://www.tensorflow.org/tutorials/reinforcement_learning/actor_critic
+
 }
