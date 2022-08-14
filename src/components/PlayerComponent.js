@@ -8,14 +8,14 @@ class AbstractPlayerComponent extends React.Component {
         super(props);
         this.animateMovingTimer = null;
 
-        this.player = props.player;
-        this.player.addMoveCallback(this.playerMoveHandler.bind(this));
-        this.player.diedCallback = () => { this.setState({ died: true }) };
+        // this.props.player = props.player;
+        this.props.player.moveCallback = this.playerMoveHandler.bind(this);
+        this.props.player.diedCallback = () => { this.setState({ died: true }) };
 
         this.state = {
-            absx: this.xToAbdsolute(this.player.x),
-            absy: this.yToAbdsolute(this.player.y),
-            died: false,
+            absx: this.xToAbdsolute(this.props.player.x),
+            absy: this.yToAbdsolute(this.props.player.y),
+            died: this.props.player.isDied,
         };
     }
 
@@ -34,20 +34,20 @@ class AbstractPlayerComponent extends React.Component {
     }
 
     updateAnimation() {
-        let targetX = this.xToAbdsolute(this.player.x);
-        let targetY = this.yToAbdsolute(this.player.y);
+        let targetX = this.xToAbdsolute(this.props.player.x);
+        let targetY = this.yToAbdsolute(this.props.player.y);
 
         let _absx = this.state.absx +
             Math.sign(targetX - this.state.absx) *
             Math.min(
                 Math.abs(targetX - this.state.absx),
-                this.player.features.speed
+                this.props.player.features.speed
             );
         let _absy = this.state.absy +
             Math.sign(targetY - this.state.absy) *
             Math.min(
                 Math.abs(targetY - this.state.absy),
-                this.player.features.speed
+                this.props.player.features.speed
             );
 
         if (targetX === this.state.absx && targetY === this.state.absy) {
@@ -78,19 +78,19 @@ export class PlayerComponent extends AbstractPlayerComponent {
 
     keyDownHandler(e) {
         if (e.code === "ArrowLeft") {
-            this.player.move(-1, 0);
+            this.props.player.move(-1, 0);
         }
         else if (e.code === "ArrowRight") {
-            this.player.move(1, 0);
+            this.props.player.move(1, 0);
         }
         else if (e.code === "ArrowUp") {
-            this.player.move(0, -1);
+            this.props.player.move(0, -1);
         }
         else if (e.code === "ArrowDown") {
-            this.player.move(0, 1);
+            this.props.player.move(0, 1);
         }
         else if (e.code === "Space") {
-            this.player.placeBomb();
+            this.props.player.placeBomb();
         }
         else {
             return false;

@@ -3,10 +3,22 @@ import { Cell, Wall } from './Cell.js'
 
 export class Field {
     constructor(width, height) {
-        this.cells = new Map();
+        // private
         this._width = width;
         this._height = height;
+
+        // public
+        this.cells = new Map();
+
         this.#constructField();
+    }
+
+    get width() {
+        return this._width;
+    }
+
+    get height() {
+        return this._height;
     }
 
     #constructField() {
@@ -17,7 +29,6 @@ export class Field {
                 if (!destroyed)
                     cell.content = new Wall(cell);
                 this.cells.set(`${i}:${j}`, cell);
-
             }
         }
     }
@@ -28,4 +39,23 @@ export class Field {
         return cell;
     }
 
+    underBombThreat(x, y) {
+        let threat = false;
+        threat |= this.getDirectionCell(x, y, 0, 0)?.bomb ? true : false;
+        threat |= this.getDirectionCell(x, y, 1, 0)?.bomb ? true : false;
+        threat |= this.getDirectionCell(x, y, -1, 0)?.bomb ? true : false;
+        threat |= this.getDirectionCell(x, y, 0, 1)?.bomb ? true : false;
+        threat |= this.getDirectionCell(x, y, 0, -1)?.bomb ? true : false;
+        return threat;
+    }
+
+    getDirectionCell(x, y, dx, dy) {
+        let cell = this.getCell(x + dx, y + dy);
+        if (!cell) return null;
+        if (cell._content.size > 0)
+            return cell;
+        if (dx === 0 && dy === 0)
+            return null;
+        return this.getDirectionCell(x + dx, y + dy, dx, dy);
+    }
 }

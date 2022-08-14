@@ -1,210 +1,148 @@
 // const tf = require('@tensorflow/tfjs-node-gpu');
 const tf = require('@tensorflow/tfjs');
 
-const W = 21
-const H = 11
+// const W = 21
+// const H = 11
 
-function actor_critic() {
-    let zeros = (w, h, v = 0) => Array.from(new Array(h), _ => Array(w).fill(v));
+let zeros = (w, h, v = 0) => Array.from(new Array(h), _ => Array(w).fill(v));
 
-    class A2CAgent {
-        constructor(state_size, action_size) {
-            // this.render = false;
-            this.state_size = state_size;
-            this.action_size = action_size;
-            this.value_size = 1;
+export class A2CAgent {
+    constructor(state_size, actions_size) {
+        // public
+        this.state_size = state_size;
+        this.action_size = actions_size;
+        this.value_size = 1;
 
-            this.discount_factor = 0.99;
-            this.actor_learningr = 0.001;
-            this.critic_learningr = 0.005;
+        this.discount_factor = 0.99;
+        this.actor_learningr = 0.002;
+        this.critic_learningr = 0.005;
 
-            this.actor = this.build_actor();
-            this.critic = this.build_critic();
-        }
-
-        build_actor() {
-            const model = tf.sequential();
-
-            model.add(tf.layers.dense({
-                units: 24,
-                activation: 'relu',
-                kernelInitializer: 'glorotUniform',
-                inputShape: [W, H], //oneHotShape
-            }));
-
-            model.add(tf.layers.flatten());
-
-            model.add(tf.layers.dense({
-                units: this.action_size,
-                activation: 'softmax',
-                kernelInitializer: 'glorotUniform',
-            }));
-
-            model.summary();
-
-            model.compile({
-                optimizer: tf.train.adam(this.actor_learningr),
-                loss: tf.losses.softmaxCrossEntropy
-            });
-
-            return model;
-        }
-
-        build_critic() {
-            const model = tf.sequential();
-
-            model.add(tf.layers.dense({
-                units: 24,
-                activation: 'relu',
-                kernelInitializer: 'glorotUniform',
-                inputShape: [W, H], //oneHot shape
-            }));
-
-            model.add(tf.layers.flatten());
-
-            model.add(tf.layers.dense({
-                units: this.value_size,
-                activation: 'linear',
-                kernelInitializer: 'glorotUniform',
-            }));
-
-            model.summary();
-
-            model.compile({
-                optimizer: tf.train.adam(this.critic_learningr),
-                loss: tf.losses.meanSquaredError,
-            });
-
-            return model;
-        }
-
-        format_state(state) {
-            let copy_state = state.slice();
-            for (let i = 0; i < state.length; i++) {
-                if (Array.isArray(copy_state[i])) {
-                    copy_state[i] = Math.ceil(state[i][1] / 10);
-                }
-            }
-
-            return copy_state;
-
-        }
-
-        get_action(state, actions) {
-            const math_utils = require('../utils/math_utils');
-
-            let oneHotState = tf.oneHot(this.format_state(state), H);
-
-            let policy = this.actor.predict(oneHotState.reshape([1, W, H]), {
-                batchSize: 1,
-            });
-
-            let policy_flat = policy.dataSync();
-
-            return math_utils.weightedRandomItem(actions, policy_flat);
-        }
-
-        train_model(state, action, reward, next_state, done) {
-            let target = zeros(1, this.value_size);
-            let advantages = zeros(1, this.action_size);
-
-            let oneHotState = tf.oneHot(this.format_state(state), 12);
-            let oneHotNextState = tf.oneHot(this.format_state(next_state), 12);
-            oneHotState = oneHotState.reshape([1, 9, 12])
-            oneHotNextState = oneHotNextState.reshape([1, 9, 12])
-            let value = this.critic.predict(oneHotState).flatten().get(0);
-            let next_value = this.critic.predict(oneHotNextState).flatten().get(0);
-            console.log(action) //Pb nbr d'actions dans advantages
-            if (done) {
-                advantages[action] = [reward - value];
-                target[0] = reward;
-            } else {
-                advantages[action] = [reward + this.discount_factor * (next_value) - value];
-                target[0] = reward + this.discount_factor * next_value;
-            }
-
-
-            this.actor.fit(oneHotState, tf.tensor(advantages).reshape([1, 2047]), {
-                epochs: 1,
-            });
-
-            this.critic.fit(oneHotState, tf.tensor(target), {
-                epochs: 1,
-            });
-
-        }
+        this.actor = this.#build_actor();
+        this.critic = this.#build_critic();
     }
 
+    #build_actor() {
+        const model = tf.sequential();
 
+        model.add(tf.layers.dense({
+            units: 64,
+            activation: 'relu',
+            kernelInitializer: 'glorotUniform',
+            inputShape: this.state_size, // input field state
+        }));
 
+        // model.add(tf.layers.dense({
+        //     units: 256,
+        // }));
 
+        model.add(tf.layers.dense({
+            units: 12,
+        }));
 
-    const environment = require('./environment')().EnvironmentController(1500);
-    const serialiser = require('../utils/serialisation');
+        model.add(tf.layers.dense({
+            units: this.action_size,
+            activation: 'softmax',
+            kernelInitializer: 'glorotUniform',
+        }));
 
+        console.log('Actor tf model');
+        model.summary();
 
-    async function main(offline = false) {
-        let episode_done = false;
-        if (!offline)
-            await environment.init_env();
-
-        let data = environment.getEnvironmentData();
-        const AMOUNT_ACTIONS = data.actions_index.length;
-        const STATE_SIZE = 12;
-
-        let agent = new A2CAgent(STATE_SIZE, AMOUNT_ACTIONS);
-        let reward_plotting = {};
-        let episode_length = 0;
-        for (let i = 0; i < Object.values(data.websites).length; i++) {
-            episode_done = false;
-            reward_plotting[i] = 0;
-
-            let state = environment.reset(i);
-
-
-            while (true) {
-                data = environment.getEnvironmentData();
-                console.log('Episode ' + i + ' : ' + (data.current_step + 1) + '/' + (data.length_episode + 1));
-
-                let action = agent.get_action(state, data.actions_index);
-                let step_data = await environment.step(action);
-                let next_state = step_data.state,
-                    reward = step_data.reward,
-                    done = step_data.done;
-
-                episode_length = step_data.episode_length;
-
-                reward_plotting[i] += reward < 0 ? 1 : 0;
-                agent.train_model(state, action, reward, next_state, done);
-
-                if (done) {
-                    break;
-                }
-
-                state = next_state;
-            }
-            reward_plotting[i] = (reward_plotting[i] / (episode_length + 1)) * 100;
-            await serialiser.serialise({
-                reward_plotting: reward_plotting,
-            }, 'plot_actor_critic.json');
-            // if(i%10) {
-            // agent.actor.save(__dirname+'/actor_model');
-            // agent.critic.save(__dirname+'/critic_model');
-            // }
-        }
-
-        return Promise.resolve({
-            reward_plotting: reward_plotting,
+        model.compile({
+            optimizer: tf.train.adam(this.actor_learningr),
+            loss: tf.losses.softmaxCrossEntropy
         });
+
+        return model;
     }
 
-    return {
-        main: main,
+    #build_critic() {
+        const model = tf.sequential();
+
+        model.add(tf.layers.dense({
+            units: 64,
+            activation: 'relu',
+            kernelInitializer: 'glorotUniform',
+            inputShape: this.state_size, // input field state
+        }));
+
+        // // model.add(tf.layers.flatten());
+        // model.add(tf.layers.dense({
+        //     units: 256,
+        // }));
+
+        model.add(tf.layers.dense({
+            units: 12,
+        }));
+
+        model.add(tf.layers.dense({
+            units: this.value_size,
+            activation: 'linear',
+            kernelInitializer: 'glorotUniform',
+        }));
+
+        console.log('Critic tf model');
+        model.summary();
+
+        model.compile({
+            optimizer: tf.train.adam(this.critic_learningr),
+            loss: tf.losses.meanSquaredError,
+        });
+
+        return model;
+    }
+
+    get_action(state) {
+        state = tf.tensor2d(state, [1, this.state_size]);
+        // state.print();
+
+        let policy = this.actor.predict(state, {
+            batchSize: 1,
+        });
+        // console.log(policy);
+
+        let policy_flat = policy.dataSync();
+        // console.log(policy_flat.join(", "));
+
+        // do action
+        let action_num = 0;
+        for (let i = 0; i < policy_flat.length; i++) {
+            if (policy_flat[i] > policy_flat[action_num])
+                action_num = i;
+        }
+        return action_num;
+        // this._actions[action_num]();
+    }
+
+    train(state, action, reward, nextState, done) {
+        state = tf.tensor2d(state, [1, this.state_size]);
+
+        let value = this.critic.predict(state).dataSync();
+        
+        let target = zeros(1, this.value_size);
+        let advantages = zeros(1, this.action_size);
+        
+        nextState = tf.tensor2d(nextState, [1, this.state_size]);
+        let next_value = this.critic.predict(nextState).dataSync();
+        
+        // console.log(`Critic predict value ${value} next value ${next_value} reward ${reward}`);
+        // console.log(action) //Pb nbr d'actions dans advantages
+
+        if (done) {
+            advantages[action] = [reward - value];
+            target[0] = reward;
+        } else {
+            advantages[action] = [reward + this.discount_factor * (next_value) - value];
+            target[0] = reward + this.discount_factor * next_value;
+        }
+
+        return this.actor.fit(state, tf.tensor(advantages).reshape([1, this.action_size]), {
+            epochs: 1,
+        }).then(() =>
+            this.critic.fit(state, tf.tensor(target), {
+                epochs: 1,
+            })
+        );
+
     }
 }
-
-//module.exports = new actor_critic();
-(async () => {
-    let sars = new actor_critic();
-    sars.main();
-})();

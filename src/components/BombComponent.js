@@ -1,6 +1,6 @@
 import React from "react";
 import bomb from './../resources/bomb.png'
-import * as C from  './../constants.js'
+import * as C from './../constants.js'
 import { AnimationCompoent } from './Animation.js'
 
 
@@ -8,8 +8,8 @@ import { AnimationCompoent } from './Animation.js'
 export class BombComponent extends AnimationCompoent {
     constructor(props) {
         super(props);
-        this.props.bomb._updated = this.#updatedHandler.bind(this);
-        
+
+        this.props.bomb.destroyCallback = this.#updatedHandler.bind(this);
         this.state = {
             scale: 1.0,
             x: this.props.bomb.x,
@@ -21,10 +21,10 @@ export class BombComponent extends AnimationCompoent {
 
     #updatedHandler() {
         this.finishAnimation();
-        this.setState({ 
+        this.setState({
             x: this.props.bomb.x,
             y: this.props.bomb.y,
-            exploded: this.props.bomb.exploded 
+            exploded: this.props.bomb.exploded
         });
     }
 
@@ -33,7 +33,7 @@ export class BombComponent extends AnimationCompoent {
             this.animationDirection = 1;
         if (this.state.scale > 1)
             this.animationDirection = -1;
-        this.setState((state) => ({ 
+        this.setState((state) => ({
             scale: state.scale + this.animationDirection * 0.015
         }));
     }
@@ -47,10 +47,10 @@ export class BombComponent extends AnimationCompoent {
         _top += (C.CELL_HEIGHT - _heigth) / 2;
 
         return (
-            <img src={bomb} alt="" width={_width} height={_heigth}
+            !this.state.exploded && <img src={bomb} alt="" width={_width} height={_heigth}
                 style={{
-                    position: 'absolute', 
-                    left: _left, 
+                    position: 'absolute',
+                    left: _left,
                     top: _top
                 }} />
         );

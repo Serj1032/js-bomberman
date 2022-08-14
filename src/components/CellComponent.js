@@ -54,17 +54,16 @@ export class CellComponent extends React.Component {
     }
 
     #getContentComponent() {
-        let new_content = null;
-        let content = this.props.cell.content;
-        if (content) {
+        let components = [];
+        for (let content of this.props.cell.content) {
             if (content instanceof Wall) {
-                new_content = <WallComponent wall={content} />;
+                components.push(<WallComponent key={content.toString()} wall={content} />);
             }
             if (content instanceof Bomb) {
-                new_content = <BombComponent bomb={content} />;
+                components.push(<BombComponent key={content.toString()} bomb={content} />);
             }
         }
-        return new_content;
+        return components;
     }
 
     updateContnet() {
