@@ -10,7 +10,7 @@ export class Field {
         // public
         this.cells = new Map();
 
-        this.#constructField();
+        this.constructField();
     }
 
     get width() {
@@ -21,7 +21,7 @@ export class Field {
         return this._height;
     }
 
-    #constructField() {
+    constructField() {
         for (let j = 0; j < this._height; j++) {
             for (let i = 0; i < this._width; i++) {
                 let destroyed = i > this._width / 3 && i < 2 * this._width / 3 && j > this._height / 3 && j < 2 * this._height / 3;

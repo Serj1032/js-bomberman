@@ -94,16 +94,6 @@ class AbstractPlayer extends CellContent {
         }
     }
 
-    // underBombThreat() {
-    //     let threat = false;
-    //     threat |= this._field.getDirectionCell(this.x, this.y, 0, 0)?.bomb ? true : false;
-    //     threat |= this._field.getDirectionCell(this.x, this.y, 1, 0)?.bomb ? true : false;
-    //     threat |= this._field.getDirectionCell(this.x, this.y, -1, 0)?.bomb ? true : false;
-    //     threat |= this._field.getDirectionCell(this.x, this.y, 0, 1)?.bomb ? true : false;
-    //     threat |= this._field.getDirectionCell(this.x, this.y, 0, -1)?.bomb ? true : false;
-    //     return threat;
-    // }
-
     bombExploded(score) {
         this._score += score;
         console.log(`${this} got score: ${this._score}`);
@@ -115,7 +105,7 @@ class AbstractPlayer extends CellContent {
     destroyContent() {
         if (this.isDied) return;
 
-        console.log(`${this} has died!`);
+        console.log(`---------- ${this} has died! -------------`);
         this._state.hasDied = true;
         this.#notifyDied();
     }
@@ -148,7 +138,6 @@ export class Bot extends AbstractPlayer {
         this._waitCounter = 0;
         this._lastAction = 0;
         this._lastCell = this.cell;
-        // this._lastState = this.stateFromField(field).concat(this.botState);
         this._lastState = this.botState;
 
         this.actions = [
@@ -156,7 +145,7 @@ export class Bot extends AbstractPlayer {
             () => this.move(-1, 0),
             () => this.move(0, 1),
             () => this.move(0, -1),
-            // () => console.log(`${this} wait...`),
+            () => console.log(`${this} wait...`),
             () => this.placeBomb(),
         ];
 
@@ -167,39 +156,39 @@ export class Bot extends AbstractPlayer {
 
     set a2c(a2c) {
         this._a2c = a2c;
-        setTimeout(() => this.training(), 2000);
+        // setTimeout(() => this.training(), 2000);
     }
 
-    training() {
+    async training() {
         // save last cell and do action
         let action = this._a2c.get_action(this._lastState);
-        let reward = this.getReward(action);
         this.actions[action]();
 
-        if (action === 4 && this._lastAction === 4) {
+        let reward = this.getReward(action);
+
+        // if (action === 4 && this._lastAction === 4) {
+        if (action !== 6) {
             this._waitCounter += 1;
-            if (this._waitCounter > 20)
+            if (this._waitCounter > 20) {
+                reward = -5;
                 this.destroy();
+            }
         }
         else {
             this._waitCounter = 0;
         }
+        console.log(`Reward: ${reward}`);
 
         // new state after action
         let state = this.botState;
 
         // train a2c
-        this._a2c.train(
+        await this._a2c.train(
             this._lastState,
             action,
             reward,
             state,
-            this.isDied).then(
-                () => {
-                    if (!this.isDied)
-                        setTimeout(() => this.training(), 200);
-                }
-            );
+            this.isDied);
 
         // update state
         this._lastAction = action;
@@ -211,16 +200,15 @@ export class Bot extends AbstractPlayer {
         let state = [];
 
         // placed bombs amount
-        state.push(this._state.bombsAmount / this.features.bombCapacity);
+        state.push(this.features.bombCapacity - this._state.bombsAmount);
         // moving direction
         state.push(this.x - this._lastCell.x);
         state.push(this.y - this._lastCell.y);
-        // walls environment
-        // TODO: надо поменять стену на проверку, что туда можно переместиться
-        state.push(this._field.getCell(this.x - 1, this.y)?.wall ? 1 : 0);
-        state.push(this._field.getCell(this.x + 1, this.y)?.wall ? 1 : 0);
-        state.push(this._field.getCell(this.x, this.y + 1)?.wall ? 1 : 0);
-        state.push(this._field.getCell(this.x, this.y - 1)?.wall ? 1 : 0);
+        // move available directions
+        state.push(this._field.getCell(this.x - 1, this.y)?.moveAvailable ? 1 : 0);
+        state.push(this._field.getCell(this.x + 1, this.y)?.moveAvailable ? 1 : 0);
+        state.push(this._field.getCell(this.x, this.y + 1)?.moveAvailable ? 1 : 0);
+        state.push(this._field.getCell(this.x, this.y - 1)?.moveAvailable ? 1 : 0);
         // bot under bomb threat
         state.push(this._field.getDirectionCell(this.x, this.y, 0, 0)?.bomb ? 1 : 0);
         state.push(this._field.getDirectionCell(this.x, this.y, 1, 0)?.bomb ? 1 : 0);
@@ -228,70 +216,43 @@ export class Bot extends AbstractPlayer {
         state.push(this._field.getDirectionCell(this.x, this.y, 0, 1)?.bomb ? 1 : 0);
         state.push(this._field.getDirectionCell(this.x, this.y, 0, -1)?.bomb ? 1 : 0);
         // cell under bomb threat
-        state.push(this._field.underBombThreat(this.x + 1, this.y) ? 1 - state[7] : 0);
-        state.push(this._field.underBombThreat(this.x - 1, this.y) ? 1 - state[7] : 0);
-        state.push(this._field.underBombThreat(this.x, this.y + 1) ? 1 - state[7] : 0);
-        state.push(this._field.underBombThreat(this.x, this.y - 1) ? 1 - state[7] : 0);
+        state.push(this._field.underBombThreat(this.x + 1, this.y) ? 1 : 0);
+        state.push(this._field.underBombThreat(this.x - 1, this.y) ? 1 : 0);
+        state.push(this._field.underBombThreat(this.x, this.y + 1) ? 1 : 0);
+        state.push(this._field.underBombThreat(this.x, this.y - 1) ? 1 : 0);
 
         let i = 0;
-        let s = `ba:${state[i++]} | dx:${state[i++]} dy:${state[i++]} |`
-        s += ` wl:${state[i++]} wr:${state[i++]} wt:${state[i++]} wb:${state[i++]} |`
-        s += ` b:${state[i++]} bl:${state[i++]} br:${state[i++]} bt:${state[i++]} bb:${state[i++]}|`
+        let s = `ba:${state[i++]} |`
+        s += ` dx:${state[i++]} dy:${state[i++]} |`
+        s += ` wl:${state[i++]} wr:${state[i++]} wb:${state[i++]} wt:${state[i++]} |`
+        s += ` b:${state[i++]}  bl:${state[i++]} br:${state[i++]} bt:${state[i++]} bb:${state[i++]} |`
         s += ` ct_r:${state[i++]} ct_l:${state[i++]} ct_b:${state[i++]} ct_t:${state[i++]}`
-        console.log(`Bot ${this.cell} state:\n\t${s}`);
+        console.log(`${this} ${this.cell} state:\n\t${s}`);
         return state;
     }
 
     getReward(action) {
-        // надо смываться а он бомбы ставит
-        if (this._lastAction === 5 && action === 5)
-            return -2;
-
-        // наградим за то что поставил бомбу
-        if (action === 5) {
-            return 0.5;
-        }
-
         if (this._field.underBombThreat(this.x, this.y)) {
             this._was_ubt = true;
-            return Bot.THREAT_BOMB_REWARD;
+            return -2;
         }
-        else{
-            if (this._was_ubt){
+        else {
+            if (this._was_ubt) {
                 this._was_ubt = false;
-                return 5;
+                return 1;
             }
         }
 
-        // let reward = 0.05;
-
-        // // награда за количество поставленных бомб
-        // if (this._state.bombsAmount !== 0)
-        //     reward += this._state.bombsAmount * Bot.PLACED_BOMB_REWARD;
+        // наградим за то что поставил бомбу
+        if (action === 5) {
+            return 5;
+        }
 
         // накажем за бездействие
         if (this._lastCell === this.cell) {
-            // reward += -0.2;
-            return -0.2;
+            return -1;
         }
 
         return 0;
-        // if (action === 0 && !this._field.getCell(this.x + 1, this.y)?.moveAvailable) {
-        //     reward += -0.5;
-        //     console.log('Move right prohibited!');
-        // }
-        // if (action === 1 && !this._field.getCell(this.x - 1, this.y)?.moveAvailable) {
-        //     reward += -0.5;
-        //     console.log('Move left prohibited!');
-        // }
-        // if (action === 2 && !this._field.getCell(this.x, this.y + 1)?.moveAvailable) {
-        //     reward += -0.5;
-        //     console.log('Move bottom prohibited!');
-        // }
-        // if (action === 3 && !this._field.getCell(this.x, this.y - 1)?.moveAvailable) {
-        //     console.log('Move top prohibited!');
-        //     reward += -0.5;
-        // }
-        // return reward;
     }
 }

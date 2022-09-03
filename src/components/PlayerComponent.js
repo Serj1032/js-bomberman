@@ -1,71 +1,28 @@
 import React from 'react';
 import * as C from './../constants.js'
 import player from './../resources/player.png'
+import { ImageComponent } from './ImageComponent.js';
 
 
 class AbstractPlayerComponent extends React.Component {
     constructor(props) {
         super(props);
-        this.animateMovingTimer = null;
-
-        // this.props.player = props.player;
         this.props.player.moveCallback = this.playerMoveHandler.bind(this);
         this.props.player.diedCallback = () => { this.setState({ died: true }) };
 
         this.state = {
-            absx: this.xToAbdsolute(this.props.player.x),
-            absy: this.yToAbdsolute(this.props.player.y),
+            x: this.props.player.x,
+            y: this.props.player.y,
             died: this.props.player.isDied,
         };
     }
 
     playerMoveHandler() {
-        if (this.animateMovingTimer)
-            return;
-        this.animateMoving();
-    }
-
-    yToAbdsolute(y) {
-        return y * (C.CELL_HEIGHT + C.CELL_MARGIN) + C.CELL_OFFESET;
-    }
-
-    xToAbdsolute(x) {
-        return x * (C.CELL_WIDTH + C.CELL_MARGIN) + C.CELL_WIDTH / 3 + C.CELL_OFFESET;
-    }
-
-    updateAnimation() {
-        let targetX = this.xToAbdsolute(this.props.player.x);
-        let targetY = this.yToAbdsolute(this.props.player.y);
-
-        let _absx = this.state.absx +
-            Math.sign(targetX - this.state.absx) *
-            Math.min(
-                Math.abs(targetX - this.state.absx),
-                this.props.player.features.speed
-            );
-        let _absy = this.state.absy +
-            Math.sign(targetY - this.state.absy) *
-            Math.min(
-                Math.abs(targetY - this.state.absy),
-                this.props.player.features.speed
-            );
-
-        if (targetX === this.state.absx && targetY === this.state.absy) {
-            clearInterval(this.animateMovingTimer);
-            this.animateMovingTimer = null;
-            return;
-        }
+        if (!this.props.player) return;
         this.setState({
-            absx: _absx,
-            absy: _absy,
+            x: this.props.player.x,
+            y: this.props.player.y,
         });
-    }
-
-    animateMoving() {
-        this.animateMovingTimer = setInterval(
-            () => this.updateAnimation(),
-            30
-        );
     }
 }
 
@@ -102,15 +59,19 @@ export class PlayerComponent extends AbstractPlayerComponent {
 
     render() {
         return (
-            !this.state.died && <img src={player} alt=""
-                width={C.CELL_WIDTH / 2}
-                height={C.CELL_HEIGHT}
-                onKeyDown={this.keyDownHandler}
-                style={{
-                    position: 'absolute',
-                    left: this.state.absx,
-                    top: this.state.absy
-                }} />
+            // TODO: add onKeyDown handler
+            // !this.state.died && <img src={player} alt=""
+            //     width={C.CELL_WIDTH / 2}
+            //     height={C.CELL_HEIGHT}
+            //     onKeyDown={this.keyDownHandler}
+            //     style={{
+            //         position: 'absolute',
+            //         left: this.state.x,
+            //         top:  this.state.y
+            //     }} />
+            !this.state.died && <ImageComponent img={player}
+                x={this.state.x}
+                y={this.state.y}/>
         );
     }
 }
@@ -119,14 +80,9 @@ export class PlayerComponent extends AbstractPlayerComponent {
 export class BotComponent extends AbstractPlayerComponent {
     render() {
         return (
-            !this.state.died && <img src={player} alt=""
-                width={C.CELL_WIDTH / 2}
-                height={C.CELL_HEIGHT}
-                style={{
-                    position: 'absolute',
-                    left: this.state.absx,
-                    top: this.state.absy
-                }} />
+            !this.state.died && <ImageComponent img={player}
+                x={this.state.x}
+                y={this.state.y}/>
         );
     }
 }

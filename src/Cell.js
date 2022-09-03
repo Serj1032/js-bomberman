@@ -111,7 +111,7 @@ export class Cell {
     get bomb() {
         for (let content of this._content) {
             if (content instanceof Bomb) {
-                console.log(`${this} has ${content}`);
+                // console.log(`${this} has ${content}`);
                 return content;
             }
         }

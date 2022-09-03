@@ -19,13 +19,15 @@ export class A2CAgent {
 
         this.actor = this.#build_actor();
         this.critic = this.#build_critic();
+
+        this.mutex = false;
     }
 
     #build_actor() {
         const model = tf.sequential();
 
         model.add(tf.layers.dense({
-            units: 64,
+            units: this.state_size,
             activation: 'relu',
             kernelInitializer: 'glorotUniform',
             inputShape: this.state_size, // input field state
@@ -36,7 +38,7 @@ export class A2CAgent {
         // }));
 
         model.add(tf.layers.dense({
-            units: 12,
+            units: 2*this.action_size,
         }));
 
         model.add(tf.layers.dense({
@@ -60,7 +62,7 @@ export class A2CAgent {
         const model = tf.sequential();
 
         model.add(tf.layers.dense({
-            units: 64,
+            units: this.state_size,
             activation: 'relu',
             kernelInitializer: 'glorotUniform',
             inputShape: this.state_size, // input field state
@@ -71,9 +73,9 @@ export class A2CAgent {
         //     units: 256,
         // }));
 
-        model.add(tf.layers.dense({
-            units: 12,
-        }));
+        // model.add(tf.layers.dense({
+        //     units: 12,
+        // }));
 
         model.add(tf.layers.dense({
             units: this.value_size,
@@ -115,6 +117,9 @@ export class A2CAgent {
     }
 
     train(state, action, reward, nextState, done) {
+        // while (this.mutex);
+        // this.mutex = true;
+
         state = tf.tensor2d(state, [1, this.state_size]);
 
         let value = this.critic.predict(state).dataSync();
@@ -138,10 +143,12 @@ export class A2CAgent {
 
         return this.actor.fit(state, tf.tensor(advantages).reshape([1, this.action_size]), {
             epochs: 1,
-        }).then(() =>
+        }).then(() =>{
             this.critic.fit(state, tf.tensor(target), {
                 epochs: 1,
-            })
+            });
+            // this.mutex = false;
+        }
         );
 
     }
